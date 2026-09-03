@@ -1239,17 +1239,17 @@
     lines.push('_Equipo de Comunicaciones Serenya_');
     return lines.join('\n');
   }
-  /* El texto "#no_universal_links" que reportó Sofi es algo que WhatsApp (o el redireccionamiento
-     entre medio) agrega por su cuenta cuando su link (wa.me o api.whatsapp.com, probamos los dos) se
-     abre desde DENTRO de una vista empotrada como este artefacto (que siempre vive en un iframe,
-     incluso en la app de Claude) — no se podía arreglar solo cambiando el link. Sofi pidió quitarlo
-     de raíz, así que ahora el link de WhatsApp (wa.me/api.whatsapp.com) ya NO es el camino principal:
-     cada botón intenta primero `navigator.share()` (el "compartir" nativo del teléfono/navegador),
-     que manda el mensaje directo a la app que el usuario elija (WhatsApp, Telegram, etc.) sin pasar
-     por ningún link de WhatsApp — así no hay redireccionamiento que le agregue nada al texto. Si el
-     navegador no soporta `navigator.share` (o el iframe no lo permite), se cae al plan de respaldo de
-     siempre: copiar el mensaje al portapapeles y abrir el link de WhatsApp por si acaso. El mensaje
-     real de cada botón se guarda en su atributo `data-msg`. */
+  /* El texto "#no_universal_links" que reportó Sofi hace tiempo pasaba solo cuando esto vivía DENTRO
+     de una vista empotrada (el artefacto de Claude, siempre en un iframe) — por eso en esa época se
+     usaba `navigator.share()` (el "compartir" nativo del sistema) en vez del link directo de WhatsApp.
+     Ahora que esto es un sitio independiente (ya no hay iframe), ese problema no aplica, y además
+     `navigator.share()` en computadores (Windows/Mac) abre el panel genérico de "Compartir" del sistema
+     operativo en vez de ir directo al número correcto — obligaba a elegir el contacto a mano, perdiendo
+     el propósito de tener un botón específico por persona. Por eso cada botón ahora navega directo a su
+     `href` (ya armado con el número correcto de Vero/Profe/equipo + el mensaje), que es el link real
+     `https://api.whatsapp.com/send?phone=...&text=...` — WhatsApp Web/Desktop/App lo reconoce y abre
+     ese chat puntual con el mensaje ya redactado. Antes de navegar, se copia el mensaje al portapapeles
+     por si hace falta pegarlo de nuevo. El mensaje real de cada botón se guarda en su atributo `data-msg`. */
   function copyTextFallback(text){
     try{
       var ta = document.createElement('textarea');
@@ -1266,38 +1266,16 @@
       return ok;
     }catch(e){ return false; }
   }
-  function copyWhatsappMsgFallback(el, text){
-    function done(ok){
-      showToast(ok ? 'Mensaje copiado — si no aparece completo en WhatsApp, pégalo (mantén presionado el cuadro de texto → Pegar).' : 'No se pudo copiar automático: copia el mensaje manualmente antes de enviarlo.');
-    }
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(copyTextFallback(text)); });
-    } else {
-      done(copyTextFallback(text));
-    }
-    if(el && el.href && el.href.indexOf('whatsapp.com')>-1){
-      try{ window.open(el.href, '_blank'); }catch(e){}
-    }
-  }
   window.copyWhatsappMsg = function(el, ev){
     var text = (el && el.dataset && el.dataset.msg) || '';
-    if(!text) return true;
-    if(navigator.share){
-      if(ev && ev.preventDefault) ev.preventDefault();
-      try{
-        navigator.share({text: text}).then(function(){
-          showToast('Elige WhatsApp en el menú para enviarlo.');
-        }).catch(function(err){
-          if(err && err.name==='AbortError') return; // el usuario cerró el menú de compartir, no insistir
-          copyWhatsappMsgFallback(el, text);
-        });
-      }catch(e){
-        copyWhatsappMsgFallback(el, text);
+    if(text){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).catch(function(){ copyTextFallback(text); });
+      } else {
+        copyTextFallback(text);
       }
-      return false;
     }
-    copyWhatsappMsgFallback(el, text);
-    return true;
+    return true; // deja que el navegador siga el link normal del botón directo a WhatsApp
   };
   function setWhatsappHref(elId, number, msg, visible){
     var a = $('#'+elId);
