@@ -385,8 +385,10 @@
     </select>
     <input type="text" id="filterText" placeholder="Buscar por título o idea…" oninput="renderAll()" style="min-width:180px;">
     <div class="spacer"></div>
-    <a class="btn btn-ghost btn-sm" id="whatsappBtn" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar por WhatsApp</a>
-    <a class="btn btn-ghost btn-sm" id="whatsappPublicadoBtn" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar por WhatsApp</a>
+    <a class="btn btn-ghost btn-sm" id="whatsappBtnVero" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar a Vero</a>
+    <a class="btn btn-ghost btn-sm" id="whatsappBtnProfe" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar a la Profe</a>
+    <a class="btn btn-ghost btn-sm" id="whatsappPublicadoBtnVero" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar a Vero</a>
+    <a class="btn btn-ghost btn-sm" id="whatsappPublicadoBtnProfe" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar a la Profe</a>
     <a class="btn btn-ghost btn-sm" id="notifyTeamBtn" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyWhatsappMsg(this, event)">📲 Avisar reajustes al grupo</a>
     <button class="btn btn-primary" id="addBtn" onclick="handleAddClick()">+ Nuevo contenido</button>
     <button class="btn btn-primary" id="addGuionBtn" onclick="handleAddGuionClick()">+ Nueva semana de guion</button>
@@ -507,8 +509,9 @@
   var TIKTOK_URL = 'https://www.tiktok.com/@serenyareservaecuestre?_r=1&_t=ZS-99Njx2Ks1Qq';
   var ARTIFACT_PUBLIC_URL = 'https://bit.ly/CalendarioSerenya2026-2'; // link corto y legible (lo creó Sofi con bit.ly) para WhatsApp — location.href adentro del artefacto no es un link amigable
   var ONEDRIVE_PARENT_URL = 'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCZhkhRNteNS40Y3EZv0_oeAUCMHmjoBTgXGfyb1PTK_9I?e=fk8RIx'; // TODO Sofi: reemplazar por el link de cada subcarpeta semanal cuando los tengas
-  var WHATSAPP_NUMBER = '573215919727'; // número de prueba (Sofi) para avisar a Vero/Profe — cambiar cuando tengamos los definitivos
-  var EQUIPO_WHATSAPP_NUMBER = '573215919727'; // número al que le llega el aviso cuando Vero/Profe actúan — cambiar cuando tengamos el del equipo
+  var VERO_WHATSAPP_NUMBER = '573052461587'; // número real de Verónica
+  var PROFE_WHATSAPP_NUMBER = '573104221203'; // número real de la Profe Adriana
+  var EQUIPO_WHATSAPP_NUMBER = '573215919727'; // número al que le llega el aviso cuando Vero/Profe actúan (Sofi / Equipo comunicaciones)
 
   /* aprobación independiente: Vero y la Profe dan cada una su propio veredicto (pendiente/aprobado/ajustar).
      El contenido solo pasa a "aprobado" cuando las dos aprobaron; si cualquiera pide ajustes, va a "ajustar". */
@@ -1296,14 +1299,19 @@
     copyWhatsappMsgFallback(el, text);
     return true;
   };
-  function updateWhatsappLink(){
-    var a = $('#whatsappBtn');
+  function setWhatsappHref(elId, number, msg, visible){
+    var a = $('#'+elId);
     if(!a) return;
-    a.style.display = (isEquipo() && currentStatusTab==='en-revision') ? '' : 'none';
-    var msg = buildWhatsappMessage();
+    a.style.display = visible ? '' : 'none';
     a.dataset.msg = msg;
-    a.href = 'https://api.whatsapp.com/send?phone=' + WHATSAPP_NUMBER + '&text=' + encodeURIComponent(msg);
+    a.href = 'https://api.whatsapp.com/send?phone=' + number + '&text=' + encodeURIComponent(msg);
     if(isMobileView()){ a.removeAttribute('target'); } else { a.setAttribute('target','_blank'); }
+  }
+  function updateWhatsappLink(){
+    var msg = buildWhatsappMessage();
+    var visible = isEquipo() && currentStatusTab==='en-revision';
+    setWhatsappHref('whatsappBtnVero', VERO_WHATSAPP_NUMBER, msg, visible);
+    setWhatsappHref('whatsappBtnProfe', PROFE_WHATSAPP_NUMBER, msg, visible);
   }
 
   function buildPublicadoWhatsappMessage(){
@@ -1320,13 +1328,10 @@
     return lines.join('\n');
   }
   function updatePublicadoWhatsappBtn(){
-    var a = $('#whatsappPublicadoBtn');
-    if(!a) return;
-    a.style.display = (isEquipo() && currentStatusTab==='publicado') ? '' : 'none';
     var msg = buildPublicadoWhatsappMessage();
-    a.dataset.msg = msg;
-    a.href = 'https://api.whatsapp.com/send?phone=' + WHATSAPP_NUMBER + '&text=' + encodeURIComponent(msg);
-    if(isMobileView()){ a.removeAttribute('target'); } else { a.setAttribute('target','_blank'); }
+    var visible = isEquipo() && currentStatusTab==='publicado';
+    setWhatsappHref('whatsappPublicadoBtnVero', VERO_WHATSAPP_NUMBER, msg, visible);
+    setWhatsappHref('whatsappPublicadoBtnProfe', PROFE_WHATSAPP_NUMBER, msg, visible);
   }
 
   /* botón fijo "Avisar al equipo" para Vero/Profe. El mensaje se arma con lo último que quedó resuelto
