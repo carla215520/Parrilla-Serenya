@@ -718,6 +718,14 @@
       el.style.display = hide ? 'none' : '';
     });
     if(hide && APPROVER_HIDDEN_TABS.indexOf(currentStatusTab)>-1){ switchStatusTab('en-revision'); }
+    /* pedido de Sofi (ronda 9): en los perfiles de Vero y la Profe, la pestaña "Total" va al final
+       (después de "Publicado") en vez de ser la primera — para Equipo se queda donde siempre. */
+    var tabsBar = $('#statusTabs');
+    var totalTabEl = document.querySelector('#statusTabs .tab[data-tab="total"]');
+    if(tabsBar && totalTabEl){
+      if(hide){ tabsBar.appendChild(totalTabEl); }
+      else if(tabsBar.firstChild !== totalTabEl){ tabsBar.insertBefore(totalTabEl, tabsBar.firstChild); }
+    }
   }
   function isEquipo(){ return myRole === 'equipo'; }
   function isApprover(){ return myRole === 'vero' || myRole === 'profe'; }
@@ -726,6 +734,13 @@
      importar si una ya aprobó o ya pidió ajustes. El estado solo pasa a "Aprobado" o "Rechazado/ajustar"
      una vez que las dos ya dieron su respuesta (ver recomputeEstado). */
   function isAwaitingApproval(rec){ return rec.estado==='en-revision'; }
+  /* pedido de Sofi (ronda 9): en la pestaña "Total" de Vero y la Profe, solo deben aparecer los
+     contenidos/guiones con los que ESA persona ya interactuó (aprobó o pidió ajustes) — los que
+     todavía están "por hacer" o esperando su voto no aportan nada ahí (ya están en "En revisión").
+     Para Equipo, "Total" sigue mostrando todo, sin este filtro. */
+  function hasInteracted(rec){
+    return !!(rec.aprobaciones && rec.aprobaciones[myRole] && rec.aprobaciones[myRole].estado !== 'pendiente');
+  }
   /* en celular, abrir links externos (WhatsApp, OneDrive) en una pestaña nueva a veces falla
      porque el navegador/app no completa el "hand-off" a la app externa; navegar directo
      (sin target=_blank) es más confiable para que sí abran en el teléfono. En computador
@@ -859,20 +874,9 @@
       rec.estado = 'en-revision';
       return;
     }
-    /* el aviso para el equipo (pendingNotify) guarda el veredicto completo de LAS DOS personas, no solo
-       de quien acaba de votar — antes solo guardaba un único "actor" (a veces Verónica, a veces la Profe,
-       según una regla que no seguía el orden real de los votos) y el botón de avisar mostraba ese nombre
-       sin importar en qué perfil estuviera abierta la app en ese momento, lo cual confundía ("dice avisar
-       rechazo de Vero y estoy en el perfil de Adriana"). Ahora el mensaje siempre describe lo que hizo
-       cada una, así que es correcto sin importar quién lo esté mirando o quién lo vaya a mandar. */
     if(v==='aprobado' && p==='aprobado'){
       rec.estado = 'aprobado';
       rec.notaAjuste = '';
-      state.meta.pendingNotify = {
-        titulo: rec.titulo, status:'aprobado',
-        vero: {estado:'aprobado', nota:''}, profe: {estado:'aprobado', nota:''},
-        ts: nowIso()
-      };
     } else {
       // ambas ya decidieron y al menos una pidió ajustes (la otra haya aprobado o también pedido ajustes)
       rec.estado = 'ajustar';
@@ -880,11 +884,6 @@
       if(v==='ajustar') notas.push(rec.aprobaciones.vero.actor+': '+rec.aprobaciones.vero.nota);
       if(p==='ajustar') notas.push(rec.aprobaciones.profe.actor+': '+rec.aprobaciones.profe.nota);
       rec.notaAjuste = notas.join(' · ');
-      state.meta.pendingNotify = {
-        titulo: rec.titulo, status:'ajustar',
-        vero: {estado: v, nota: rec.aprobaciones.vero.nota}, profe: {estado: p, nota: rec.aprobaciones.profe.nota},
-        ts: nowIso()
-      };
     }
   }
 
@@ -908,6 +907,18 @@
       rec.historial.push({fecha:nowIso(), autor:actor, accion:'Dio su aprobación'});
     }
     recomputeEstado(rec);
+    /* pedido de Sofi (ronda 9): el aviso para el equipo (pendingNotify) se arma apenas UNA persona vota,
+       no solo cuando las dos ya decidieron — antes, si Vero votaba y la Profe todavía no, el botón
+       "Avisar al equipo" mostraba "no hay nada nuevo que avisar" (porque pendingNotify seguía en null),
+       aunque Vero sí hubiera aprobado o pedido ajustes. Ahora el mensaje siempre describe el estado ACTUAL
+       de las dos (una puede seguir "pendiente" si todavía no le toca a ella responder) — es correcto sin
+       importar quién lo esté mirando o quién lo vaya a mandar. */
+    state.meta.pendingNotify = {
+      titulo: rec.titulo, status: rec.estado,
+      vero: {estado: rec.aprobaciones.vero.estado, nota: rec.aprobaciones.vero.nota},
+      profe: {estado: rec.aprobaciones.profe.estado, nota: rec.aprobaciones.profe.nota},
+      ts: nowIso()
+    };
     if(openItemId===id) openItemModal(id);
     if(openGuionId===id) openGuionModal(id);
     persist();
@@ -1045,6 +1056,7 @@
   /* ---------- list ---------- */
   function renderList(){
     var items = getFiltered().slice().sort(function(a,b){ return a.fecha.localeCompare(b.fecha); });
+    if(isApprover()){ items = items.filter(hasInteracted); }
     if(!items.length){ $('#listWrap').innerHTML = '<div class="empty">No hay contenido con estos filtros.</div>'; return; }
     var html = items.map(itemCardHtml).join('');
     $('#listWrap').innerHTML = html;
@@ -1227,9 +1239,15 @@
       lines.push('Actualmente tienen '+total+' pendiente'+(total===1?'':'s')+' de aprobación y revisión:', '');
       pend.forEach(function(it){
         var fechaRef = it.fechaLimiteAprobacion || it.fecha;
-        lines.push('• '+fmtDateLong(fechaRef)+' – '+redLabel(it.red)+' (revisión '+(it.revisionCount+1)+') _'+it.titulo+'_', '');
+        /* pedido de Sofi (ronda 9): no tiene sentido aclarar "(revisión 1)" en la primera revisión — el
+           número solo se muestra a partir de la segunda vez que se reenvía (revisionCount>0). */
+        var revTag = it.revisionCount>0 ? ' (revisión '+(it.revisionCount+1)+')' : '';
+        lines.push('• '+fmtDateLong(fechaRef)+' – '+redLabel(it.red)+revTag+' _'+it.titulo+'_', '');
       });
-      pendG.forEach(function(g){ lines.push('• Guion – '+g.titulo+' (revisión '+(g.revisionCount+1)+')', ''); });
+      pendG.forEach(function(g){
+        var revTag = g.revisionCount>0 ? ' (revisión '+(g.revisionCount+1)+')' : '';
+        lines.push('• Guion – '+g.titulo+revTag, '');
+      });
     } else {
       lines.push('Por ahora no tienen nada pendiente de aprobación ni revisión. Les dejo el link por si quieren echarle un vistazo cuando gusten.', '');
     }
@@ -1547,6 +1565,7 @@
     var cards = GUION_WEEKS.map(function(gid){
       var g = state.guiones.find(function(x){ return x.id===gid; });
       if(!g || !matchesFilters(g, f, true)) return '';
+      if(isApprover() && !hasInteracted(g)) return '';
       return guionCardHtml(g);
     }).join('');
     $('#guionesWrap').innerHTML = cards || '<div class="empty">No hay guiones con estos filtros.</div>';
