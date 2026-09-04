@@ -604,12 +604,15 @@
   };
   GUION_WEEKS.forEach(function(gid){
     if(!state.guiones.find(function(x){ return x.id===gid; })){
-      state.guiones.push({id:gid, titulo:GUION_LABELS[gid], oneDriveUrl:GUION_ONEDRIVE_URLS[gid]||ONEDRIVE_PARENT_URL, urlContenidosRevisar:GUION_REVISAR_URLS[gid]||'', estado:'por-hacer', notaAjuste:'', revisionCount:0, comentarios:[], historial:[], aprobaciones:defaultAprobaciones()});
+      state.guiones.push({id:gid, titulo:GUION_LABELS[gid], oneDriveUrl:GUION_ONEDRIVE_URLS[gid]||ONEDRIVE_PARENT_URL, urlContenidosRevisar:GUION_REVISAR_URLS[gid]||'', estado:'por-hacer', notaAjuste:'', revisionCount:0, fechaLimiteAprobacion:'', comentarios:[], historial:[], aprobaciones:defaultAprobaciones()});
     }
   });
   state.guiones.forEach(function(g){
     if(g.notaAjuste===undefined) g.notaAjuste = '';
     if(g.revisionCount===undefined) g.revisionCount = 0;
+    /* pedido de Sofi (ronda 10): los guiones no tenían fecha límite de aprobación individual (a
+       diferencia de los contenidos) — se agrega el mismo campo, con el mismo comportamiento. */
+    if(g.fechaLimiteAprobacion===undefined) g.fechaLimiteAprobacion = '';
     if(!g.aprobaciones) g.aprobaciones = inferAprobaciones(g);
     if(g.urlContenidosRevisar===undefined) g.urlContenidosRevisar = GUION_REVISAR_URLS[g.id] || '';
     /* semana 1-5 ya existían apuntando al link genérico compartido; ahora que Sofi mandó el link
@@ -1136,8 +1139,10 @@
        publicación, sin decirlo) con la fecha límite de aprobación — antes esa distinción se explicaba con
        la banderita 🚩 y la burbuja de color del Calendario, pero seguía sin quedar claro. Se quitó ese
        ícono de todos lados y en su lugar: la fecha de esta tarjeta ahora dice explícitamente "Publica" y,
-       solo para quien aprueba, se agrega una casilla aparte con la fecha límite de aprobación. */
-    var fechaAprobacionChip = (!isGuion && isApprover() && it.fechaLimiteAprobacion)
+       solo para quien aprueba, se agrega una casilla aparte con la fecha límite de aprobación. Desde la
+       ronda 10 los guiones también pueden tener esta fecha (antes solo los contenidos), así que la
+       casilla ya no se excluye para ellos. */
+    var fechaAprobacionChip = (isApprover() && it.fechaLimiteAprobacion)
       ? '<div style="margin-top:5px;"><span class="chip chip-aprobacion">Fecha aprobación: '+fmtDate(it.fechaLimiteAprobacion)+'</span></div>'
       : '';
     return '<div class="pending-item" style="'+(badge?'padding-top:24px;':'')+'">'+
@@ -1246,7 +1251,11 @@
       });
       pendG.forEach(function(g){
         var revTag = g.revisionCount>0 ? ' (revisión '+(g.revisionCount+1)+')' : '';
-        lines.push('• Guion – '+g.titulo+revTag, '');
+        /* pedido de Sofi (ronda 10): mostrar la fecha límite de aprobación del guion cuando esté
+           cargada — igual que en los contenidos. Si no se ha puesto, se omite (antes era el único
+           caso posible, ya que los guiones no tenían este campo). */
+        var fechaTag = g.fechaLimiteAprobacion ? (fmtDateLong(g.fechaLimiteAprobacion)+' – ') : '';
+        lines.push('• '+fechaTag+'Guion – '+g.titulo+revTag, '');
       });
     } else {
       lines.push('Por ahora no tienen nada pendiente de aprobación ni revisión. Les dejo el link por si quieren echarle un vistazo cuando gusten.', '');
@@ -1636,9 +1645,13 @@
       /* pedido de Sofi (ronda 3): un solo link por semana — se quitó el segundo campo de "contenidos
          pendientes de revisar" y se renombró este a "Link del guion". */
       html += '<div class="field"><label>Link del guion</label><input type="text" id="g_url" value="'+(g?esc(g.oneDriveUrl):'')+'" placeholder="https://onedrive.live.com/..."></div>';
+      /* pedido de Sofi (ronda 10): los guiones ahora también tienen fecha límite de aprobación,
+         igual que los contenidos — mismo campo, mismo comportamiento. */
+      html += '<div class="field"><label>Fecha límite de aprobación</label><input type="date" id="g_fechaLimite" value="'+(g?g.fechaLimiteAprobacion:'')+'"></div>';
       html += '<div class="action-row"><button class="btn btn-primary" onclick="saveGuionForm()">Guardar</button><div class="spacer"></div></div>';
     } else {
       html += '<div class="field"><label>Link del guion</label><div class="field-value">'+(g.oneDriveUrl? '<a href="'+esc(g.oneDriveUrl)+'"'+extTargetAttr()+' rel="noopener">Abrir en OneDrive ↗</a>' : '—')+'</div></div>';
+      html += '<div class="field"><label>Fecha límite de aprobación</label><div class="field-value">'+(g.fechaLimiteAprobacion ? fmtDate(g.fechaLimiteAprobacion) : '—')+'</div></div>';
     }
     if(!isNew){
       html += '<div class="field" style="margin-top:8px;"><span class="status-badge st-'+g.estado+'">'+STATUS_LABEL[g.estado]+'</span></div>';
@@ -1654,6 +1667,7 @@
 
   window.saveGuionForm = function(){
     var url = $('#g_url').value.trim();
+    var fechaLimite = $('#g_fechaLimite') ? $('#g_fechaLimite').value : '';
     var actor = myRole ? ROLE_LABELS[myRole] : 'Alguien del equipo';
     if(openGuionId){
       var g = state.guiones.find(function(x){ return x.id===openGuionId; });
@@ -1661,6 +1675,11 @@
       if(g.oneDriveUrl !== url){
         g.oneDriveUrl = url;
         g.historial.push({fecha:nowIso(), autor:actor, accion:'Actualizó el link del guion'});
+      }
+      /* pedido de Sofi (ronda 10): guardar la fecha límite de aprobación del guion, igual que en contenidos */
+      if(g.fechaLimiteAprobacion !== fechaLimite){
+        g.fechaLimiteAprobacion = fechaLimite;
+        g.historial.push({fecha:nowIso(), autor:actor, accion:'Actualizó la fecha límite de aprobación'});
       }
     } else {
       var nextNum = GUION_WEEKS.length + 1;
@@ -1670,7 +1689,7 @@
       state.guiones.push({
         id: gid, titulo: 'Semana ' + nextNum, oneDriveUrl: url, estado: 'por-hacer',
         notaAjuste: '', comentarios: [], historial: [{fecha:nowIso(), autor:actor, accion:'Creó la semana de guion'}],
-        aprobaciones: defaultAprobaciones(), revisionCount: 0
+        aprobaciones: defaultAprobaciones(), revisionCount: 0, fechaLimiteAprobacion: fechaLimite
       });
     }
     closeGuionModal();
