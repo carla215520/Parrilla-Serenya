@@ -561,52 +561,84 @@
     if(!it.aprobaciones) it.aprobaciones = inferAprobaciones(it);
   });
 
-  var GUION_WEEKS = ['semana-1','semana-2','semana-3','semana-4','semana-5','semana-6','semana-7','semana-8','semana-9','semana-10','semana-11'];
+  /* pedido de Sofi (ronda 11): los links de guion deben corresponder según la red — cada semana tiene
+     DOS guiones para aprobar (uno de Instagram y otro de TikTok), cada uno con su propio link de la
+     carpeta de guiones y su propia carpeta de "contenidos para revisar" (antes había un solo guion por
+     semana que en realidad solo apuntaba, sin decirlo, a las carpetas de Instagram — TikTok no tenía
+     guion propio en la app). Solo hay 9 semanas reales (confirmado con Sofi); "semana-10"/"semana-11"
+     eran datos viejos sin carpetas reales detrás (los links llegaron duplicados/rotos) y se eliminaron. */
+  var GUION_WEEK_NUMS = [1,2,3,4,5,6,7,8,9];
+  var GUION_WEEKS = [];
+  GUION_WEEK_NUMS.forEach(function(n){ GUION_WEEKS.push('semana-'+n+'-instagram', 'semana-'+n+'-tiktok'); });
   /* pedido de Sofi (ronda 6): Equipo ahora puede agregar semanas nuevas desde la app (ver addNewGuionWeek
      / saveGuionForm) — esas quedan guardadas en `state.guiones`, pero este arreglo fijo de arriba se
-     reconstruye igual en cada carga de la página, así que hay que completarlo con cualquier semana que
+     reconstruye igual en cada carga de la página, así que hay que completarlo con cualquier semana/red que
      ya exista en los datos y no esté en la lista fija, para que no "desaparezca" al recargar. */
   state.guiones.forEach(function(g){
-    if(/^semana-\d+$/.test(g.id) && GUION_WEEKS.indexOf(g.id)===-1){ GUION_WEEKS.push(g.id); }
+    if(/^semana-\d+-(instagram|tiktok)$/.test(g.id) && GUION_WEEKS.indexOf(g.id)===-1){ GUION_WEEKS.push(g.id); }
   });
-  GUION_WEEKS.sort(function(a,b){ return parseInt(a.split('-')[1],10) - parseInt(b.split('-')[1],10); });
+  GUION_WEEKS.sort(function(a,b){
+    var ma = /^semana-(\d+)-(instagram|tiktok)$/.exec(a), mb = /^semana-(\d+)-(instagram|tiktok)$/.exec(b);
+    var na = ma?parseInt(ma[1],10):0, nb = mb?parseInt(mb[1],10):0;
+    if(na!==nb) return na-nb;
+    return (ma?ma[2]:'').localeCompare(mb?mb[2]:'');
+  });
+  function guionRedFromId(gid){ var m=/-(instagram|tiktok)$/.exec(gid); return m?m[1]:''; }
+  function guionWeekNumFromId(gid){ var m=/^semana-(\d+)-/.exec(gid); return m?m[1]:''; }
   var GUION_LABELS = {};
-  GUION_WEEKS.forEach(function(gid,i){ GUION_LABELS[gid] = 'Semana '+(i+1); });
-  /* carpetas de OneDrive de cada semana (las pasó Sofi el 2 sept.) — falta la de semana 9 (guion),
-     se usa el link general como respaldo mientras la envía. Semana 4 llegó igual a semana 3 y semana 7
-     igual a semana 6 — tal cual las mandó, revisar con Sofi si fue un error de copiar/pegar. */
+  GUION_WEEKS.forEach(function(gid){ GUION_LABELS[gid] = 'Semana '+guionWeekNumFromId(gid)+' — '+redLabel(guionRedFromId(gid)); });
+  /* carpetas de OneDrive de cada semana, separadas por red (confirmadas navegando la carpeta SERENYA
+     compartida: "Guiones para revisión" y "Contenidos para revisión" ya tienen subcarpetas Instagram/
+     TikTok por semana). TikTok semana 9 todavía no tiene carpeta de "contenidos para revisar" creada. */
   var GUION_ONEDRIVE_URLS = {
-    'semana-1':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgB3s-Ae_WVTT5Omd0ad2fc_AdcqVtZM0iqCG-3Osvk9hfY?e=I9DPfP',
-    'semana-2':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBYrS-iaeynQZy00y4avrQdAXDVmbQmS-EgcH5m2oEMYOI?e=oRRV3H',
-    'semana-3':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBkSoKtjxhGR42o8a6CzeXwARefxaFtHdtO9YUtkHaQRCs?e=X9325T',
-    'semana-4':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBiI35op7G5R4T5LvZnCW3WATUt8QCvBMDGHLeHu_3TTBE?e=EWQX55',
-    'semana-5':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCwGLQdC3UaQ7IJ7RD-M2N5Af5x0NlJyd0_mVTIocS8Cx8?e=inROxD',
-    'semana-6':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDd8srk5ySgS75gm4DQBKgjARu8G0JxoQ2_OWMWdIl02yc?e=eiaBrg',
-    'semana-7':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDoiAVSCQNWRoNsgqft1gQLAS-z6-Vdm4pC6AobVF5NV4o?e=NM6xAY',
-    'semana-8':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgChdac5zbSjT6XpwEnrTDgmAU7XHkCMUM-T3Z_hyGfjDy4?e=2m4sop',
-    'semana-9':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDSNdnioc4PRake1cQQoXmwAUsfr5mlq6PIU4Tg1wXhRYQ?e=6Jr22U',
-    'semana-10':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDSNdnioc4PRake1cQQoXmwAUsfr5mlq6PIU4Tg1wXhRYQ?e=nUVv4X',
-    'semana-11':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBg1XZonmCaQI9C8yRsoTMvAb1Ay42ocuf2w-3qLOg1dk8?e=fVTQ2i'
+    'semana-1-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgB3s-Ae_WVTT5Omd0ad2fc_AdcqVtZM0iqCG-3Osvk9hfY?e=I9DPfP',
+    'semana-2-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBYrS-iaeynQZy00y4avrQdAXDVmbQmS-EgcH5m2oEMYOI?e=oRRV3H',
+    'semana-3-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBkSoKtjxhGR42o8a6CzeXwARefxaFtHdtO9YUtkHaQRCs?e=X9325T',
+    'semana-4-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgBiI35op7G5R4T5LvZnCW3WATUt8QCvBMDGHLeHu_3TTBE?e=EWQX55',
+    'semana-5-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCwGLQdC3UaQ7IJ7RD-M2N5Af5x0NlJyd0_mVTIocS8Cx8?e=inROxD',
+    'semana-6-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDd8srk5ySgS75gm4DQBKgjARu8G0JxoQ2_OWMWdIl02yc?e=eiaBrg',
+    'semana-7-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDoiAVSCQNWRoNsgqft1gQLAS-z6-Vdm4pC6AobVF5NV4o?e=NM6xAY',
+    'semana-8-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgChdac5zbSjT6XpwEnrTDgmAU7XHkCMUM-T3Z_hyGfjDy4?e=2m4sop',
+    'semana-9-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDSNdnioc4PRake1cQQoXmwAUsfr5mlq6PIU4Tg1wXhRYQ?e=6Jr22U',
+    'semana-1-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%201',
+    'semana-2-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%202',
+    'semana-3-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%203',
+    'semana-4-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%204',
+    'semana-5-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%205',
+    'semana-6-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%206',
+    'semana-7-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%207',
+    'semana-8-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%208',
+    'semana-9-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FGuiones%20para%20revisi%C3%B3n%2FTikTok%2FSemana%209'
   };
-  /* carpetas de "Contenidos para revisar" (material ya subido, pendiente de aprobación) de cada semana */
+  /* carpetas de "Contenidos para revisar" (material ya subido, pendiente de aprobación) de cada semana y red */
   var GUION_REVISAR_URLS = {
-    'semana-1':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgA5GA6c_5nWTrNuCH4g8ET7AT3NsDjNQZ_mmU18UGxP-EQ?e=46Cke5',
-    'semana-2':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCPIkd0NILmQ6Co4Pd6DGDkAYeNF2S-FI9i9ewbF8BX4WA?e=S4RlbN',
-    'semana-3':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgARSW_dXgfUSopvKuecNLRGAfafokIE2V75TCtvEMTRvAk?e=MRS7Pf',
-    'semana-4':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgAe6LuGYNKqS4wD449s4B7sAY4sdWE0HdXn6GxQdsywDtU?e=peAn1S',
-    'semana-5':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgB5s1zyqNRwQYz5a1n9jUkhAdvlMx05HBu_m3SoHSb519o?e=z077f6',
-    'semana-6':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDjhqSt7eqbTZ8ZbHcUUEuXAUklTXZ14F9EVRw2ebpxDwU?e=xcaytF',
-    'semana-7':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCiStzHyWdIRYDBi4yCYuaDAawyW4DC2luWgPY_ghI0p3o?e=rWlfVY',
-    'semana-8':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCZ3wdUY1C8Tqn8BLujarDXAf0ZXVm35OBESTt7O6yz0xc?e=CvYhzQ',
-    'semana-9':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCTeLRBzycdSqDBsIdr6OfwAaEDK3T7Xdr3ubCQTx8usCk?e=Qsbyt5',
-    'semana-10':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgAuuI3VUzXTRb6gjIM6bCTZASzPFsPOJsktLi79oN8Qc4g?e=bxNgc1',
-    'semana-11':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCAO2tCcp0TQKlFUbDj5491AaDK_OixxDSWl0YIE_tlFpU?e=Uozjyx'
+    'semana-1-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgA5GA6c_5nWTrNuCH4g8ET7AT3NsDjNQZ_mmU18UGxP-EQ?e=46Cke5',
+    'semana-2-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCPIkd0NILmQ6Co4Pd6DGDkAYeNF2S-FI9i9ewbF8BX4WA?e=S4RlbN',
+    'semana-3-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgARSW_dXgfUSopvKuecNLRGAfafokIE2V75TCtvEMTRvAk?e=MRS7Pf',
+    'semana-4-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgAe6LuGYNKqS4wD449s4B7sAY4sdWE0HdXn6GxQdsywDtU?e=peAn1S',
+    'semana-5-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgB5s1zyqNRwQYz5a1n9jUkhAdvlMx05HBu_m3SoHSb519o?e=z077f6',
+    'semana-6-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgDjhqSt7eqbTZ8ZbHcUUEuXAUklTXZ14F9EVRw2ebpxDwU?e=xcaytF',
+    'semana-7-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCiStzHyWdIRYDBi4yCYuaDAawyW4DC2luWgPY_ghI0p3o?e=rWlfVY',
+    'semana-8-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCZ3wdUY1C8Tqn8BLujarDXAf0ZXVm35OBESTt7O6yz0xc?e=CvYhzQ',
+    'semana-9-instagram':'https://upbeduco-my.sharepoint.com/:f:/g/personal/sofia_velezr_upb_edu_co/IgCTeLRBzycdSqDBsIdr6OfwAaEDK3T7Xdr3ubCQTx8usCk?e=Qsbyt5',
+    'semana-1-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%201',
+    'semana-2-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%202',
+    'semana-3-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%203',
+    'semana-4-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%204',
+    'semana-5-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%205',
+    'semana-6-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%206',
+    'semana-7-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%207',
+    'semana-8-tiktok':'https://upbeduco-my.sharepoint.com/personal/sofia_velezr_upb_edu_co/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fsofia%5Fvelezr%5Fupb%5Fedu%5Fco%2FDocuments%2FSERENYA%2FContenidos%20para%20revisi%C3%B3n%2FTikTok%2FSemana%208'
+    /* semana-9-tiktok: no existe todavía la carpeta de "Contenidos para revisión" en OneDrive — queda sin link hasta que Sofi la cree */
   };
   GUION_WEEKS.forEach(function(gid){
     if(!state.guiones.find(function(x){ return x.id===gid; })){
-      state.guiones.push({id:gid, titulo:GUION_LABELS[gid], oneDriveUrl:GUION_ONEDRIVE_URLS[gid]||ONEDRIVE_PARENT_URL, urlContenidosRevisar:GUION_REVISAR_URLS[gid]||'', estado:'por-hacer', notaAjuste:'', revisionCount:0, fechaLimiteAprobacion:'', comentarios:[], historial:[], aprobaciones:defaultAprobaciones()});
+      state.guiones.push({id:gid, titulo:GUION_LABELS[gid], red:guionRedFromId(gid), oneDriveUrl:GUION_ONEDRIVE_URLS[gid]||ONEDRIVE_PARENT_URL, urlContenidosRevisar:GUION_REVISAR_URLS[gid]||'', estado:'por-hacer', notaAjuste:'', revisionCount:0, fechaLimiteAprobacion:'', comentarios:[], historial:[], aprobaciones:defaultAprobaciones()});
     }
   });
+  /* semanas viejas sin red (formato "semana-N" plano, de antes de este cambio) — ya no corresponden a
+     nada real en GUION_WEEKS; se quitan de state.guiones para que no queden huérfanas ni se resiembren. */
+  state.guiones = state.guiones.filter(function(g){ return !/^semana-\d+$/.test(g.id); });
   state.guiones.forEach(function(g){
     if(g.notaAjuste===undefined) g.notaAjuste = '';
     if(g.revisionCount===undefined) g.revisionCount = 0;
@@ -615,7 +647,8 @@
     if(g.fechaLimiteAprobacion===undefined) g.fechaLimiteAprobacion = '';
     if(!g.aprobaciones) g.aprobaciones = inferAprobaciones(g);
     if(g.urlContenidosRevisar===undefined) g.urlContenidosRevisar = GUION_REVISAR_URLS[g.id] || '';
-    /* semana 1-5 ya existían apuntando al link genérico compartido; ahora que Sofi mandó el link
+    if(g.red===undefined) g.red = guionRedFromId(g.id);
+    /* semanas ya existían apuntando al link genérico compartido; ahora que Sofi mandó el link
        específico de cada una, se reemplaza (si alguien ya lo había personalizado a mano, se respeta). */
     if(g.oneDriveUrl === ONEDRIVE_PARENT_URL && GUION_ONEDRIVE_URLS[g.id]){ g.oneDriveUrl = GUION_ONEDRIVE_URLS[g.id]; }
   });
@@ -833,9 +866,9 @@
     return {red:red, txt:txt};
   }
   function matchesFilters(rec, f, isGuion){
-    /* la red (Instagram/TikTok) solo aplica a contenidos — los guiones no tienen una red propia,
-       así que el filtro de red nunca los oculta */
-    if(!isGuion && f.red && rec.red !== f.red) return false;
+    /* pedido de Sofi (ronda 11): ahora los guiones también tienen su propia red (Instagram/TikTok,
+       uno por semana y red), así que el filtro de red los filtra igual que a los contenidos. */
+    if(f.red && rec.red !== f.red) return false;
     if(f.txt){
       var hay = rec.titulo.toLowerCase() + ' ' + (isGuion ? '' : (rec.idea||'').toLowerCase());
       if(hay.indexOf(f.txt) === -1) return false;
@@ -965,7 +998,7 @@
     return '<div class="pending-item" style="cursor:pointer;" onclick="'+openFn+'(\''+rec.id+'\')">'+
       '<div class="pending-info">'+
         '<p class="item-title" style="margin:0 0 3px;font-size:15px;">'+(isGuion?('📝 '+esc(rec.titulo)):contentTitleHtml(rec))+'</p>'+
-        '<div class="item-meta">'+(isGuion ? 'Guion' : (fmtDate(rec.fecha)+' &middot; '+redLabel(rec.red)+' &middot; '+esc(rec.formato)))+'</div>'+
+        '<div class="item-meta">'+(isGuion ? ('Guion &middot; '+redLabel(rec.red)) : (fmtDate(rec.fecha)+' &middot; '+redLabel(rec.red)+' &middot; '+esc(rec.formato)))+'</div>'+
       '</div>'+
       rightSide+
     '</div>';
@@ -1149,7 +1182,7 @@
       (badge ? '<div class="pending-revision-badge">'+badge+'</div>' : '')+
       '<div class="pending-info">'+
         '<p class="item-title" style="margin:0 0 3px;cursor:pointer;font-size:15px;" onclick="'+openFn+'(\''+it.id+'\')">'+(isGuion?('📝 '+esc(it.titulo)):contentTitleHtml(it))+'</p>'+
-        '<div class="item-meta">'+(isGuion ? 'Guion' : ('Publica: '+fmtDate(it.fecha)+' &middot; '+redLabel(it.red)+' &middot; '+esc(it.formato)))+'</div>'+
+        '<div class="item-meta">'+(isGuion ? ('Guion &middot; '+redLabel(it.red)) : ('Publica: '+fmtDate(it.fecha)+' &middot; '+redLabel(it.red)+' &middot; '+esc(it.formato)))+'</div>'+
         fechaAprobacionChip+
       '</div>'+
       '<div class="pending-actions">'+ approveActionsHtml(it.id, 'pend') + linkInActions +'</div>'+
@@ -1584,7 +1617,7 @@
     var canAct = isApprover() && isAwaitingApproval(g);
     var html = '<div class="guion-card border-'+g.estado+'">'+
       '<div class="item-top">'+
-        '<div><p class="item-title">📝 '+esc(g.titulo)+'</p></div>'+
+        '<div><p class="item-title">📝 '+esc(g.titulo)+'</p><span class="chip chip-red-'+g.red+'">'+redLabel(g.red)+'</span></div>'+
         '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'+
           revisionBadgeHtml(g)+
           '<span class="status-badge st-'+g.estado+'">'+STATUS_LABEL[g.estado]+'</span>'+
@@ -1640,8 +1673,15 @@
     var editable = isEquipo();
 
     var html = '<button class="modal-close" onclick="closeGuionModal()">✕</button>';
-    html += '<h3>'+(isNew ? 'Nueva semana de guion' : esc(g.titulo))+'</h3>';
+    html += '<h3>'+(isNew ? 'Nuevo guion de semana' : esc(g.titulo))+'</h3>';
     if(editable){
+      /* pedido de Sofi (ronda 11): cada semana tiene un guion por red — al crear uno nuevo hay que
+         elegir a cuál red corresponde, para armar el id/título correctos (ver saveGuionForm). */
+      if(isNew){
+        html += '<div class="field"><label>Red</label><select id="g_red">'+
+          ['instagram','tiktok'].map(function(r){ return '<option value="'+r+'">'+redLabel(r)+'</option>'; }).join('')+
+        '</select></div>';
+      }
       /* pedido de Sofi (ronda 3): un solo link por semana — se quitó el segundo campo de "contenidos
          pendientes de revisar" y se renombró este a "Link del guion". */
       html += '<div class="field"><label>Link del guion</label><input type="text" id="g_url" value="'+(g?esc(g.oneDriveUrl):'')+'" placeholder="https://onedrive.live.com/..."></div>';
@@ -1682,12 +1722,22 @@
         g.historial.push({fecha:nowIso(), autor:actor, accion:'Actualizó la fecha límite de aprobación'});
       }
     } else {
-      var nextNum = GUION_WEEKS.length + 1;
-      var gid = 'semana-' + nextNum;
+      /* pedido de Sofi (ronda 11): cada semana tiene un guion por red — se calcula el próximo número de
+         semana mirando lo que ya existe (no GUION_WEEKS.length, que ahora cuenta 2 por semana), y el id
+         incluye la red elegida arriba. */
+      var red = $('#g_red') ? $('#g_red').value : 'instagram';
+      var maxWeek = 0;
+      state.guiones.forEach(function(gx){
+        var n = parseInt(guionWeekNumFromId(gx.id), 10);
+        if(n > maxWeek) maxWeek = n;
+      });
+      var nextNum = maxWeek + 1;
+      var gid = 'semana-' + nextNum + '-' + red;
+      var titulo = 'Semana ' + nextNum + ' — ' + redLabel(red);
       GUION_WEEKS.push(gid);
-      GUION_LABELS[gid] = 'Semana ' + nextNum;
+      GUION_LABELS[gid] = titulo;
       state.guiones.push({
-        id: gid, titulo: 'Semana ' + nextNum, oneDriveUrl: url, estado: 'por-hacer',
+        id: gid, titulo: titulo, red: red, oneDriveUrl: url, urlContenidosRevisar: '', estado: 'por-hacer',
         notaAjuste: '', comentarios: [], historial: [{fecha:nowIso(), autor:actor, accion:'Creó la semana de guion'}],
         aprobaciones: defaultAprobaciones(), revisionCount: 0, fechaLimiteAprobacion: fechaLimite
       });
